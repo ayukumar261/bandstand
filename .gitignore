@@ -27,6 +27,8 @@ out/
 build
 dist
 
+# Claude
+.claude/
 
 # Debug
 npm-debug.log*
@@ -36,3 +38,9 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Ruby
+.bundle/
+vendor/bundle/
+tmp/
+*.log
