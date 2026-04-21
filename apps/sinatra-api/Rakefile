@@ -1,0 +1,36 @@
+# frozen_string_literal: true
+
+require 'sequel'
+require 'dotenv/load'
+Sequel.extension :migration
+
+MIGRATIONS_DIR = File.expand_path('db/migrations', __dir__)
+
+def db
+  @db ||= Sequel.connect(ENV.fetch('DATABASE_URL'))
+end
+
+namespace :db do
+  desc 'Run pending migrations (optional TARGET=version)'
+  task :migrate do
+    target = ENV['TARGET']&.to_i
+    Sequel::Migrator.run(db, MIGRATIONS_DIR, target: target)
+    puts "Migrated to #{target || 'latest'}"
+  end
+
+  desc 'Roll back N migrations (STEP=1 default)'
+  task :rollback do
+    steps = (ENV['STEP'] || 1).to_i
+    applied = db[:schema_migrations].select_map(:filename).sort
+    target_idx = applied.size - steps - 1
+    target_version = target_idx >= 0 ? applied[target_idx][/^\d+/].to_i : 0
+    Sequel::Migrator.run(db, MIGRATIONS_DIR, target: target_version)
+    puts "Rolled back #{steps} step(s) to version #{target_version}"
+  end
+
+  desc 'Show current schema version'
+  task :version do
+    latest = db[:schema_migrations].select_map(:filename).max
+    puts "Current version: #{latest || 'none'}"
+  end
+end
