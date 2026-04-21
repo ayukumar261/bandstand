@@ -1,0 +1,17 @@
+.env
+.env.*
+.git
+.gitignore
+node_modules
+tmp/
+log/
+*.log
+vendor/bundle
+.bundle/
+coverage/
+.DS_Store
+.idea
+.vscode
+Dockerfile
+.dockerignore
+README.md

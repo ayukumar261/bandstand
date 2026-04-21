@@ -17,5 +17,23 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    build:
+      context: ./apps/sinatra-api
+      dockerfile: Dockerfile
+    container_name: api
+    restart: unless-stopped
+    ports:
+      - "4567:4567"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/database
+      RACK_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./apps/sinatra-api:/app
+    command: bundle exec rerun --dir . --pattern '**/*.rb' --force-polling -- rackup config.ru -p 4567 -o 0.0.0.0
+
 volumes:
   postgres_data:
