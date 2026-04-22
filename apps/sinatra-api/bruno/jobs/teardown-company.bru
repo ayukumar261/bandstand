@@ -1,0 +1,15 @@
+meta {
+  name: Teardown Parent Company
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/companies/{{jobsCompanyId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 204
+}

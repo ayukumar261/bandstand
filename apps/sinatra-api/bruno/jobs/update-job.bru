@@ -1,0 +1,41 @@
+meta {
+  name: Update Job
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/jobs/{{jobId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "title": "Staff Backend Engineer",
+    "type": "contract"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.title: eq "Staff Backend Engineer"
+  res.body.type: eq "contract"
+  res.body.description: eq "Build cool stuff"
+  res.body.location: eq "Remote"
+}
+
+tests {
+  test("company_id is unchanged after a partial update", function() {
+    expect(res.body.company_id).to.equal(Number(bru.getVar("jobsCompanyId")));
+  });
+
+  test("updated_at is at or after created_at", function() {
+    expect(new Date(res.body.updated_at).getTime())
+      .to.be.at.least(new Date(res.body.created_at).getTime());
+  });
+}

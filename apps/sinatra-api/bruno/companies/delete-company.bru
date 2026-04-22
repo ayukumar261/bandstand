@@ -1,0 +1,21 @@
+meta {
+  name: Delete Company
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/companies/{{companyId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 204
+}
+
+tests {
+  test("response body is empty", function() {
+    expect(res.body == null || res.body === "").to.be.true;
+  });
+}

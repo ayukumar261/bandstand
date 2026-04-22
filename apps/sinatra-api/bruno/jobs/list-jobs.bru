@@ -1,0 +1,32 @@
+meta {
+  name: List Jobs
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/jobs
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}
+
+tests {
+  test("response includes the job we just created", function() {
+    const id = Number(bru.getVar("jobId"));
+    const found = res.body.find(function(j) { return j.id === id; });
+    expect(found).to.exist;
+    expect(found.title).to.equal("Senior Backend Engineer");
+    expect(found.company_id).to.equal(Number(bru.getVar("jobsCompanyId")));
+  });
+
+  test("results are ordered by id ascending", function() {
+    const ids = res.body.map(function(j) { return j.id; });
+    const sorted = ids.slice().sort(function(a, b) { return a - b; });
+    expect(ids).to.deep.equal(sorted);
+  });
+}

@@ -1,0 +1,35 @@
+meta {
+  name: Setup Parent Company
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/companies
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Parent Co (jobs suite)",
+    "industry": "Software",
+    "location": "Remote"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.id: isNumber
+  res.body.name: eq "Parent Co (jobs suite)"
+}
+
+tests {
+  test("stash parent companyId for the jobs suite", function() {
+    bru.setVar("jobsCompanyId", res.body.id);
+  });
+}

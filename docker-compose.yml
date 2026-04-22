@@ -23,6 +23,8 @@ services:
       dockerfile: Dockerfile
     container_name: api
     restart: unless-stopped
+    tty: true
+    stdin_open: true
     ports:
       - "4567:4567"
     environment:

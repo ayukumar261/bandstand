@@ -1,0 +1,29 @@
+meta {
+  name: Get Company
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/companies/{{companyId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: isNumber
+  res.body.name: eq "Acme Corp"
+  res.body.website: eq "https://acme.example"
+  res.body.industry: eq "Manufacturing"
+  res.body.location: eq "Remote"
+  res.body.size: eq "201-500"
+  res.body.created_at: isString
+  res.body.updated_at: isString
+}
+
+tests {
+  test("returned id matches the stashed companyId", function() {
+    expect(res.body.id).to.equal(Number(bru.getVar("companyId")));
+  });
+}

@@ -1,0 +1,50 @@
+meta {
+  name: Create Job
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/jobs
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "id": 999,
+    "company_id": {{jobsCompanyId}},
+    "title": "Senior Backend Engineer",
+    "description": "Build cool stuff",
+    "type": "full-time",
+    "location": "Remote",
+    "hacker": true
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.id: isNumber
+  res.body.id: neq 999
+  res.body.title: eq "Senior Backend Engineer"
+  res.body.description: eq "Build cool stuff"
+  res.body.type: eq "full-time"
+  res.body.location: eq "Remote"
+  res.body.hacker: isUndefined
+  res.body.created_at: isString
+  res.body.updated_at: isString
+}
+
+tests {
+  test("company_id matches the parent we just created", function() {
+    expect(res.body.company_id).to.equal(Number(bru.getVar("jobsCompanyId")));
+  });
+
+  test("server-assigned id is stashed for later requests", function() {
+    bru.setVar("jobId", res.body.id);
+  });
+}

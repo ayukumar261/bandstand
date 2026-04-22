@@ -1,0 +1,32 @@
+meta {
+  name: Get Job
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/jobs/{{jobId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: isNumber
+  res.body.title: eq "Senior Backend Engineer"
+  res.body.description: eq "Build cool stuff"
+  res.body.type: eq "full-time"
+  res.body.location: eq "Remote"
+  res.body.created_at: isString
+  res.body.updated_at: isString
+}
+
+tests {
+  test("returned id matches the stashed jobId", function() {
+    expect(res.body.id).to.equal(Number(bru.getVar("jobId")));
+  });
+
+  test("company_id still points at the parent company", function() {
+    expect(res.body.company_id).to.equal(Number(bru.getVar("jobsCompanyId")));
+  });
+}

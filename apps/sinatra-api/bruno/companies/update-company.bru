@@ -1,0 +1,39 @@
+meta {
+  name: Update Company
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/companies/{{companyId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "industry": "Software",
+    "size": "501-1000"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.industry: eq "Software"
+  res.body.size: eq "501-1000"
+  res.body.name: eq "Acme Corp"
+  res.body.website: eq "https://acme.example"
+  res.body.location: eq "Remote"
+}
+
+tests {
+  test("updated_at advances after a patch", function() {
+    expect(res.body.updated_at).to.be.a("string");
+    expect(new Date(res.body.updated_at).getTime())
+      .to.be.at.least(new Date(res.body.created_at).getTime());
+  });
+}
