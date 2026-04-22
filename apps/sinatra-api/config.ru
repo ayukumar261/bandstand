@@ -1,4 +1,9 @@
 # frozen_string_literal: true
 
 require_relative './app'
-run Sinatra::Application
+require_relative './controllers/companies_controller'
+require_relative './controllers/jobs_controller'
+
+use CompaniesController
+use JobsController
+run App
