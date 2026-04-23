@@ -3,6 +3,7 @@ services:
     image: postgres:16-alpine
     container_name: postgres
     restart: unless-stopped
+    profiles: ["local"]
     ports:
       - "5432:5432"
     environment:
@@ -17,6 +18,22 @@ services:
       timeout: 5s
       retries: 5
 
+  cloud-sql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.13.0
+    container_name: cloud-sql-proxy
+    restart: unless-stopped
+    profiles: ["cloud"]
+    ports:
+      - "5432:5432"
+    volumes:
+      - ${HOME}/.config/gcloud:/gcloud:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /gcloud/application_default_credentials.json
+    command:
+      - "--address=0.0.0.0"
+      - "--port=5432"
+      - "bandstand-494122:us-central1:bandstand-postgres"
+
   api:
     build:
       context: ./apps/sinatra-api
@@ -28,11 +45,15 @@ services:
     ports:
       - "4567:4567"
     environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/database
+      DATABASE_URL: ${APP_DATABASE_URL:-postgres://postgres:postgres@postgres:5432/database}
       RACK_ENV: development
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
+      cloud-sql-proxy:
+        condition: service_started
+        required: false
     volumes:
       - ./apps/sinatra-api:/app
     command: bundle exec rerun --dir . --pattern '**/*.rb' --force-polling -- rackup config.ru -p 4567 -o 0.0.0.0

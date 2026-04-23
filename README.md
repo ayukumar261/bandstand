@@ -147,6 +147,59 @@ pnpm exec turbo link
 pnpm exec turbo link
 ```
 
+## Connecting to Cloud SQL locally
+
+The Sinatra API can run against either local Docker postgres or the Cloud SQL instance managed by [terraform/main.tf](terraform/main.tf). Selection is driven by `APP_ENV`:
+
+- `APP_ENV=local` (default) — uses `apps/sinatra-api/.env.local`, talks to the `postgres` service in Docker Compose
+- `APP_ENV=cloud` — uses `apps/sinatra-api/.env.cloud`, talks to Cloud SQL via `cloud-sql-proxy`
+
+### One-time setup
+
+Authenticate application default credentials so the proxy can connect:
+
+```sh
+gcloud auth application-default login
+```
+
+### Fetch the DB password
+
+The password from Secret Manager contains characters that are reserved in URLs (e.g. `!`, `#`, `+`, `(`), so it must be URL-encoded before being interpolated into `DATABASE_URL`:
+
+```sh
+RAW="$(gcloud secrets versions access latest --secret=bandstand-db-password --project=bandstand-494122)"
+export DB_PASSWORD="$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$RAW")"
+unset RAW
+```
+
+`.env.cloud` expands `${DB_PASSWORD}` from the shell, so the secret never lands on disk.
+
+### Start the proxy and api against Cloud SQL
+
+The `api` container defaults to local postgres. To point it at Cloud SQL via the proxy, export `APP_DATABASE_URL` before starting compose (note the hostname is `cloud-sql-proxy`, not `127.0.0.1` — that's the docker-network service name):
+
+```sh
+export APP_DATABASE_URL="postgres://bandstand_app:${DB_PASSWORD}@cloud-sql-proxy:5432/bandstand"
+docker compose --profile cloud up -d cloud-sql-proxy api
+```
+
+Then run the Bruno tests against `http://localhost:4567` as usual:
+
+```sh
+cd apps/sinatra-api/bruno && bru run --env local
+```
+
+### Run migrations against Cloud SQL
+
+From `apps/sinatra-api/`:
+
+```sh
+APP_ENV=cloud bundle exec rake db:migrate
+APP_ENV=cloud bundle exec rake db:version
+```
+
+The Rakefile prints the masked `DATABASE_URL` before running so you can confirm which database you're pointed at.
+
 ## Useful Links
 
 Learn more about the power of Turborepo:

@@ -8,6 +8,7 @@ node_modules
 # Local env files
 .env
 .env.local
+.env.cloud
 .env.development.local
 .env.test.local
 .env.production.local
@@ -44,3 +45,11 @@ yarn-error.log*
 vendor/bundle/
 tmp/
 *.log
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfvars
+terraform/*.tfvars.json
+terraform/crash.log

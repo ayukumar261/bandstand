@@ -1,14 +1,28 @@
 # frozen_string_literal: true
 
 require 'sequel'
-require 'dotenv/load'
+require 'dotenv'
+require 'uri'
 Sequel.extension :migration
+
+app_env = ENV.fetch('APP_ENV', 'local')
+Dotenv.load(File.expand_path(".env.#{app_env}", __dir__))
 
 MIGRATIONS_DIR = File.expand_path('db/migrations', __dir__)
 
 def db
   @db ||= Sequel.connect(ENV.fetch('DATABASE_URL'))
 end
+
+def masked_db_url
+  uri = URI.parse(ENV.fetch('DATABASE_URL'))
+  uri.password = '***' if uri.password
+  uri.to_s
+rescue URI::InvalidURIError
+  '(unparseable DATABASE_URL)'
+end
+
+puts "APP_ENV=#{app_env}  DATABASE_URL=#{masked_db_url}"
 
 namespace :db do
   desc 'Run pending migrations (optional TARGET=version)'
