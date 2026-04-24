@@ -154,25 +154,7 @@ The Sinatra API can run against either local Docker postgres or the Cloud SQL in
 - `APP_ENV=local` (default) — uses `apps/sinatra-api/.env.local`, talks to the `postgres` service in Docker Compose
 - `APP_ENV=cloud` — uses `apps/sinatra-api/.env.cloud`, talks to Cloud SQL via `cloud-sql-proxy`
 
-### One-time setup
-
-Authenticate application default credentials so the proxy can connect:
-
-```sh
-gcloud auth application-default login
-```
-
-### Fetch the DB password
-
-The password from Secret Manager contains characters that are reserved in URLs (e.g. `!`, `#`, `+`, `(`), so it must be URL-encoded before being interpolated into `DATABASE_URL`:
-
-```sh
-RAW="$(gcloud secrets versions access latest --secret=bandstand-db-password --project=bandstand-494122)"
-export DB_PASSWORD="$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$RAW")"
-unset RAW
-```
-
-`.env.cloud` expands `${DB_PASSWORD}` from the shell, so the secret never lands on disk.
+Terraform manages the Cloud SQL instance, database user, and password secret — see [terraform/README.md](terraform/README.md) for the infrastructure workflow and the DB password fetch recipe (`DB_PASSWORD` below is exported by that recipe).
 
 ### Start the proxy and api against Cloud SQL
 
@@ -183,11 +165,7 @@ export APP_DATABASE_URL="postgres://bandstand_app:${DB_PASSWORD}@cloud-sql-proxy
 docker compose --profile cloud up -d cloud-sql-proxy api
 ```
 
-Then run the Bruno tests against `http://localhost:4567` as usual:
-
-```sh
-cd apps/sinatra-api/bruno && bru run --env local
-```
+Run the API test suite against `http://localhost:4567` — see [apps/sinatra-api/bruno/README.md](apps/sinatra-api/bruno/README.md).
 
 ### Run migrations against Cloud SQL
 
