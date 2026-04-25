@@ -178,6 +178,47 @@ APP_ENV=cloud bundle exec rake db:version
 
 The Rakefile prints the masked `DATABASE_URL` before running so you can confirm which database you're pointed at.
 
+## Logging
+
+The Sinatra API uses [`semantic_logger`](https://github.com/reidmorrison/semantic_logger) plus a custom Rack middleware ([`apps/sinatra-api/lib/middleware/request_logger.rb`](apps/sinatra-api/lib/middleware/request_logger.rb)) to emit one structured log line per request. Logs are written to stdout, which Docker (and Cloud Logging when running on GCP) captures automatically.
+
+### What gets logged
+
+- **One line per request** with `method`, `path`, `status`, `duration_ms`, `remote_ip`, `user_agent`, tagged with a `request_id`.
+- **Error events** from the controller error handlers (`Sequel::NoMatchingRow`, `Sequel::ValidationFailed`, `JSON::ParserError`, and a `StandardError` catch-all that maps to a JSON 500). Each carries the exception class, message, and backtrace.
+- **Sequel SQL queries** when `LOG_LEVEL=debug`, tagged with the same `request_id` as the parent request so you can trace every query a request issued.
+
+### Format
+
+| `RACK_ENV`    | Format                  | When to use                          |
+| ------------- | ----------------------- | ------------------------------------ |
+| `development` | Colorized text          | Local dev — easier to scan by eye    |
+| `production`  | Newline-delimited JSON  | Cloud Run / log aggregators / `jq`   |
+
+The format switch lives in [apps/sinatra-api/lib/logger.rb](apps/sinatra-api/lib/logger.rb).
+
+### Environment variables
+
+- `LOG_LEVEL` — `trace`, `debug`, `info` (default), `warn`, `error`, `fatal`. Set to `debug` to surface Sequel SQL.
+- `RACK_ENV` — `development` (default in compose) or `production` (selects JSON formatter).
+
+### Request correlation
+
+Every response carries an `X-Request-Id` header. The middleware honors an inbound `X-Request-Id` if the client sends one (useful for tracing a request across services); otherwise it generates a UUID. All log lines emitted while handling that request — request line, error log, SQL queries — are tagged with the same id.
+
+```sh
+curl -i -H 'X-Request-Id: trace-abc' http://localhost:4567/companies/1
+# every log line for this call is tagged: request_id=trace-abc
+```
+
+### Reading logs in production
+
+Each line is a self-contained JSON object — pipe through `jq`:
+
+```sh
+docker compose logs api | jq -c 'select(.name == "Request") | {request_id: .named_tags.request_id, method: .payload.method, path: .payload.path, status: .payload.status, ms: .payload.duration_ms}'
+```
+
 ## Useful Links
 
 Learn more about the power of Turborepo:
