@@ -16,4 +16,4 @@ COPY . .
 
 EXPOSE 4567
 
-CMD ["bundle", "exec", "rackup", "config.ru", "-p", "4567", "-o", "0.0.0.0"]
+CMD ["bundle", "exec", "rackup", "config.ru", "-p", "4567", "-o", "0.0.0.0", "-q"]

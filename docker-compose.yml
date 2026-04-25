@@ -56,7 +56,7 @@ services:
         required: false
     volumes:
       - ./apps/sinatra-api:/app
-    command: bundle exec rerun --dir . --pattern '**/*.rb' --force-polling -- rackup config.ru -p 4567 -o 0.0.0.0
+    command: bundle exec rerun --dir . --pattern '**/*.rb' --force-polling -- rackup config.ru -p 4567 -o 0.0.0.0 -q
 
 volumes:
   postgres_data:
