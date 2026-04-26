@@ -10,10 +10,14 @@ ENV BUNDLE_PATH=/usr/local/bundle \
     BUNDLE_JOBS=4
 
 COPY Gemfile Gemfile.lock ./
-RUN bundle install
+RUN bundle config set --local without 'development' \
+ && bundle install --jobs 4 --retry 2
 
 COPY . .
 
-EXPOSE 4567
+EXPOSE 8080
 
-CMD ["bundle", "exec", "rackup", "config.ru", "-p", "4567", "-o", "0.0.0.0", "-q"]
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["server"]

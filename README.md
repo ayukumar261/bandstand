@@ -178,6 +178,106 @@ APP_ENV=cloud bundle exec rake db:version
 
 The Rakefile prints the masked `DATABASE_URL` before running so you can confirm which database you're pointed at.
 
+## Deploying to Cloud Run (with Cloud SQL)
+
+The Sinatra API runs on Cloud Run and talks to Cloud SQL over a Unix socket. No sidecar, no public IP on the database — the wiring is:
+
+- **Cloud SQL volume mount** — `google_cloud_run_v2_service.api` declares a `volumes.cloud_sql_instance` block (see [terraform/cloudrun.tf](terraform/cloudrun.tf)). Cloud Run runs the SQL Auth Proxy for you and exposes the instance as a Unix socket at `/cloudsql/<connection-name>`.
+- **Password from Secret Manager** — `DB_PASSWORD` is injected as an env var via `value_source.secret_key_ref` pointing at `bandstand-db-password`. Nothing secret lives in the image or in Terraform state.
+- **`DATABASE_URL` built at boot** — [apps/sinatra-api/docker-entrypoint.sh](apps/sinatra-api/docker-entrypoint.sh) URL-encodes `DB_PASSWORD` and assembles `postgres://user:pw@/db?host=/cloudsql/<conn>` before exec-ing the server. URL-encoding is mandatory because the auto-generated password contains URL-reserved chars (`#`, `&`, `+`, `[`, `]`, …). The Sequel connect call ([apps/sinatra-api/db/connection.rb](apps/sinatra-api/db/connection.rb)) is identical local vs. cloud.
+- **Runtime IAM** — the `bandstand-api-sa` service account ([terraform/iam.tf](terraform/iam.tf)) holds `roles/cloudsql.client`, `roles/secretmanager.secretAccessor` (scoped to the password secret), and `roles/logging.logWriter`.
+
+### Prerequisites
+
+```sh
+gcloud auth login
+gcloud auth application-default login   # used by Terraform's Google provider
+gcloud config set project bandstand-494122
+cd terraform && terraform init
+```
+
+### One-time bootstrap
+
+The first time this project is provisioned in a new GCP project, enable the APIs and create IAM + the Artifact Registry repo before any image exists. From `terraform/`:
+
+```sh
+# 1. Enable required APIs (Cloud Run, Artifact Registry, Cloud Build, Cloud SQL Admin).
+terraform apply \
+  -target=google_project_service.run \
+  -target=google_project_service.artifactregistry \
+  -target=google_project_service.cloudbuild \
+  -target=google_project_service.sqladmin
+
+# 2. Provision the runtime SA, IAM bindings, and Artifact Registry repo.
+terraform apply \
+  -target=google_artifact_registry_repository.api \
+  -target=google_service_account.api_runtime \
+  -target=google_secret_manager_secret_iam_member.api_db_password \
+  -target=google_project_iam_member.api_sql_client \
+  -target=google_project_iam_member.api_log_writer \
+  -target=google_project_iam_member.compute_default_cloudbuild_builder
+```
+
+The last binding (`compute_default_cloudbuild_builder`) grants the Compute Engine default SA the permissions Cloud Build needs to write build artifacts to its staging bucket — required on GCP projects created after the 2024 Cloud Build IAM defaults change.
+
+### Build, push, deploy
+
+Tag images with the short git SHA so rollbacks are just a re-apply with a different `image_tag`:
+
+```sh
+TAG=$(git rev-parse --short HEAD)
+
+# 1. Build on Cloud Build (native linux/amd64, sidesteps Apple Silicon mismatch).
+gcloud builds submit apps/sinatra-api \
+  --tag us-central1-docker.pkg.dev/bandstand-494122/bandstand/api:${TAG} \
+  --project bandstand-494122
+
+# 2. Roll the new image out to Cloud Run.
+cd terraform
+terraform apply -var image_tag=${TAG}
+```
+
+The first apply (with no existing service) takes ~2 minutes because Cloud Run waits for the startup probe (`GET /health`) to pass. Subsequent rollouts re-use the revision plumbing and finish in ~30s.
+
+### Run migrations
+
+Migrations are run from a laptop through the Cloud SQL Auth Proxy — Cloud Run does not run them automatically. Use the `APP_ENV=cloud` flow documented in [Connecting to Cloud SQL locally](#connecting-to-cloud-sql-locally) above.
+
+### Verify
+
+```sh
+URL=$(cd terraform && terraform output -raw api_url)
+
+curl -fsS "$URL/health"     # → {"status":"ok","service":"api","time":"..."}
+curl -fsS "$URL/companies"  # → 200 with [] or rows (proves the socket + password decoding work)
+
+cd apps/sinatra-api/bruno && bru run --env cloud   # full CRUD smoke test
+```
+
+### Rollback
+
+Re-apply the previous image tag — no rebuild needed because Artifact Registry retains every pushed image:
+
+```sh
+cd terraform
+terraform apply -var image_tag=<previous-sha>
+```
+
+### View logs
+
+Cloud Run captures stdout, and `RACK_ENV=production` puts `semantic_logger` into JSON mode (see the Logging section below):
+
+```sh
+# Tail live.
+gcloud logging tail \
+  'resource.type=cloud_run_revision AND resource.labels.service_name=bandstand-api'
+
+# Or pull the last 20 entries as JSON.
+gcloud logging read \
+  'resource.type=cloud_run_revision AND resource.labels.service_name=bandstand-api' \
+  --limit 20 --format=json
+```
+
 ## Logging
 
 The Sinatra API uses [`semantic_logger`](https://github.com/reidmorrison/semantic_logger) plus a custom Rack middleware ([`apps/sinatra-api/lib/middleware/request_logger.rb`](apps/sinatra-api/lib/middleware/request_logger.rb)) to emit one structured log line per request. Logs are written to stdout, which Docker (and Cloud Logging when running on GCP) captures automatically.
