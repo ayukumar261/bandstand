@@ -16,3 +16,8 @@ variable "service_name" {
   type    = string
   default = "bandstand-api"
 }
+
+variable "github_repo" {
+  type    = string
+  default = "ayukumar261/bandstand"
+}

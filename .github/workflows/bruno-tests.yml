@@ -1,0 +1,96 @@
+name: Bruno API Tests
+
+on:
+  pull_request:
+    paths:
+      - "apps/sinatra-api/**"
+      - ".github/workflows/bruno-tests.yml"
+
+concurrency:
+  group: bruno-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  bruno-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: database
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d database"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/database
+      RACK_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: apps/sinatra-api
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache Bruno CLI
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-bruno-cli-1.x
+
+      - name: Install Bruno CLI
+        run: npm install -g @usebruno/cli@1
+
+      - name: Run DB migrations
+        working-directory: apps/sinatra-api
+        run: bundle exec rake db:migrate
+
+      - name: Start Sinatra API
+        working-directory: apps/sinatra-api
+        run: |
+          nohup bundle exec rackup config.ru -p 4567 -o 0.0.0.0 -q \
+            > "$RUNNER_TEMP/api.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/api.pid"
+
+      - name: Wait for API ready
+        run: |
+          timeout 120 bash -c \
+            'until curl -fsS http://localhost:4567/health; do sleep 2; done'
+
+      - name: Run Bruno tests
+        working-directory: apps/sinatra-api/bruno
+        run: bru run --env local --reporter-json results.json --bail
+
+      - name: Dump API logs on failure
+        if: failure()
+        run: |
+          echo "::group::API stdout/stderr"
+          cat "$RUNNER_TEMP/api.log" || true
+          echo "::endgroup::"
+
+      - name: Upload Bruno results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bruno-results
+          path: apps/sinatra-api/bruno/results.json
+          if-no-files-found: ignore
