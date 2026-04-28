@@ -88,6 +88,18 @@ resource "google_project_iam_member" "ci_serviceusage_admin" {
   member  = "serviceAccount:${google_service_account.ci.email}"
 }
 
+resource "google_project_iam_member" "ci_wif_pool_admin" {
+  project = var.project_id
+  role    = "roles/iam.workloadIdentityPoolAdmin"
+  member  = "serviceAccount:${google_service_account.ci.email}"
+}
+
+resource "google_project_iam_member" "ci_service_account_admin" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountAdmin"
+  member  = "serviceAccount:${google_service_account.ci.email}"
+}
+
 resource "google_service_account_iam_member" "github_wif_impersonation" {
   service_account_id = google_service_account.ci.name
   role               = "roles/iam.workloadIdentityUser"
