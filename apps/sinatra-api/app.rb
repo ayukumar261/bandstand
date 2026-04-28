@@ -19,7 +19,7 @@ class App < Sinatra::Base
   before { content_type :json }
 
   get '/health' do
-    { status: 'ok', service: 'api', time: Time.now.utc.iso8601 }.to_json
+    { status: 'ok', service: 'api', version: '1.0.0', time: Time.now.utc.iso8601 }.to_json
   end
 
   not_found do
