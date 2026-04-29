@@ -1,0 +1,24 @@
+meta {
+  name: Get Application
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/applications/{{applicationId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: isNumber
+  res.body.name: eq "Ada Lovelace"
+  res.body.email: eq "ada@example.com"
+}
+
+tests {
+  test("returned id matches the stashed applicationId", function() {
+    expect(res.body.id).to.equal(Number(bru.getVar("applicationId")));
+  });
+}

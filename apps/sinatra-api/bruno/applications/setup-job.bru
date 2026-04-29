@@ -1,0 +1,41 @@
+meta {
+  name: Setup Parent Job
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/jobs
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "company_id": {{applicationsCompanyId}},
+    "title": "Parent Job (applications suite)",
+    "description": "Job under test for the applications suite",
+    "type": "full-time",
+    "location": "Remote"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.id: isNumber
+  res.body.title: eq "Parent Job (applications suite)"
+}
+
+tests {
+  test("company_id matches the parent we just created", function() {
+    expect(res.body.company_id).to.equal(Number(bru.getVar("applicationsCompanyId")));
+  });
+
+  test("stash parent jobId for the applications suite", function() {
+    bru.setVar("applicationsJobId", res.body.id);
+  });
+}
