@@ -6,4 +6,14 @@ if [[ -z "${DATABASE_URL:-}" && -n "${DB_PASSWORD:-}" ]]; then
   export DATABASE_URL="postgres://${DB_USER}:${ENC_PW}@/${DB_NAME}?host=${DB_SOCKET_DIR}"
 fi
 
-exec bundle exec rackup config.ru -p "${PORT:-8080}" -o 0.0.0.0 -q
+case "${1:-server}" in
+  server)
+    exec bundle exec rackup config.ru -p "${PORT:-8080}" -o 0.0.0.0 -q
+    ;;
+  migrate)
+    exec bundle exec rake db:migrate
+    ;;
+  *)
+    exec "$@"
+    ;;
+esac

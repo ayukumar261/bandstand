@@ -6,6 +6,7 @@ on:
     paths:
       - "apps/sinatra-api/**"
       - "terraform/cloudrun.tf"
+      - "terraform/cloudrun_job.tf"
       - ".github/workflows/deploy-api.yml"
   workflow_dispatch:
 
@@ -21,6 +22,7 @@ env:
   PROJECT_ID: bandstand-494122
   REGION: us-central1
   SERVICE: bandstand-api
+  MIGRATE_JOB: bandstand-migrate
   AR_REPO: bandstand
   IMAGE_NAME: api
 
@@ -52,10 +54,28 @@ jobs:
         with:
           terraform_version: "1.5.7"
 
+      - name: Terraform init
+        working-directory: terraform
+        run: terraform init -input=false
+
+      - name: Run DB migrations via Cloud Run Job
+        run: |
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:${GITHUB_SHA}"
+          if gcloud run jobs describe "${MIGRATE_JOB}" --region "${REGION}" >/dev/null 2>&1; then
+            echo "Updating ${MIGRATE_JOB} to ${IMAGE}"
+            gcloud run jobs update "${MIGRATE_JOB}" \
+              --region "${REGION}" \
+              --image "${IMAGE}"
+            echo "Executing ${MIGRATE_JOB}"
+            gcloud run jobs execute "${MIGRATE_JOB}" \
+              --region "${REGION}" --wait
+          else
+            echo "${MIGRATE_JOB} not found yet — Terraform will create it; skipping migration this run"
+          fi
+
       - name: Terraform apply (rolls new image onto Cloud Run)
         working-directory: terraform
         run: |
-          terraform init -input=false
           terraform apply -input=false -auto-approve \
             -var="image_tag=${GITHUB_SHA}"
 
@@ -69,3 +89,22 @@ jobs:
             echo "attempt $i got $code; retrying"; sleep 5
           done
           echo "smoke test failed"; exit 1
+
+      - name: Smoke-test /health/db
+        run: |
+          URL=$(gcloud run services describe "${SERVICE}" \
+            --region "${REGION}" --format='value(status.url)')
+          for i in 1 2 3 4 5; do
+            body=$(curl -s -o /tmp/health_db.json -w "%{http_code}" "${URL}/health/db") || body=""
+            if [ "$body" = "200" ]; then
+              version=$(jq -r '.schema_version // empty' /tmp/health_db.json)
+              if [ -n "$version" ] && [ "$version" != "null" ]; then
+                echo "OK schema_version=${version}"; exit 0
+              fi
+              echo "attempt $i: 200 but schema_version empty: $(cat /tmp/health_db.json)"
+            else
+              echo "attempt $i got $body"
+            fi
+            sleep 5
+          done
+          echo "/health/db smoke test failed"; cat /tmp/health_db.json || true; exit 1

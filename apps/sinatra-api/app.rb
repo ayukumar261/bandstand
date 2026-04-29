@@ -4,6 +4,7 @@ require 'sinatra/base'
 require 'json'
 require 'time'
 require 'semantic_logger'
+require_relative 'db/connection'
 
 class App < Sinatra::Base
   configure do
@@ -20,6 +21,11 @@ class App < Sinatra::Base
 
   get '/health' do
     { status: 'ok', service: 'api', version: '1.0.0', time: Time.now.utc.iso8601 }.to_json
+  end
+
+  get '/health/db' do
+    schema_version = DB[:schema_migrations].max(:filename)
+    { status: 'ok', schema_version: schema_version }.to_json
   end
 
   not_found do
