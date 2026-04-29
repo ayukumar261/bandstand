@@ -1,0 +1,32 @@
+meta {
+  name: List Applications
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/applications
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}
+
+tests {
+  test("response includes the application we just created", function() {
+    const id = Number(bru.getVar("applicationId"));
+    const found = res.body.find(function(a) { return a.id === id; });
+    expect(found).to.exist;
+    expect(found.name).to.equal("Ada Lovelace");
+    expect(found.job_id).to.equal(Number(bru.getVar("applicationsJobId")));
+  });
+
+  test("results are ordered by id ascending", function() {
+    const ids = res.body.map(function(a) { return a.id; });
+    const sorted = ids.slice().sort(function(a, b) { return a - b; });
+    expect(ids).to.deep.equal(sorted);
+  });
+}

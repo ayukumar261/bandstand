@@ -1,0 +1,39 @@
+meta {
+  name: Update Application
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/applications/{{applicationId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "phone": "+1-555-0199"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.phone: eq "+1-555-0199"
+  res.body.name: eq "Ada Lovelace"
+  res.body.email: eq "ada@example.com"
+}
+
+tests {
+  test("job_id is unchanged after a partial update", function() {
+    expect(res.body.job_id).to.equal(Number(bru.getVar("applicationsJobId")));
+  });
+
+  test("updated_at is at or after created_at", function() {
+    expect(new Date(res.body.updated_at).getTime())
+      .to.be.at.least(new Date(res.body.created_at).getTime());
+  });
+}
