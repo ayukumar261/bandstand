@@ -9,18 +9,20 @@ resource "google_sql_database_instance" "postgres" {
   region           = "us-central1"
 
   settings {
-    tier              = "db-f1-micro"
-    edition           = "ENTERPRISE"
-    availability_type = "ZONAL"
-    disk_size         = 10
-    disk_type         = "PD_SSD"
+    tier                  = "db-f1-micro"
+    edition               = "ENTERPRISE"
+    availability_type     = "ZONAL"
+    disk_size             = 10
+    disk_type             = "PD_SSD"
+    disk_autoresize       = false
+    disk_autoresize_limit = 10
 
     backup_configuration {
       enabled = true
     }
   }
 
-  deletion_protection = false
+  deletion_protection = true
 }
 
 resource "google_sql_database" "bandstand" {

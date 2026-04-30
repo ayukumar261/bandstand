@@ -23,6 +23,24 @@ resource "google_artifact_registry_repository" "api" {
   repository_id = "bandstand"
   format        = "DOCKER"
 
+  cleanup_policy_dry_run = false
+
+  cleanup_policies {
+    id     = "keep-recent-10"
+    action = "KEEP"
+    most_recent_versions {
+      keep_count = 10
+    }
+  }
+
+  cleanup_policies {
+    id     = "delete-older-than-30d"
+    action = "DELETE"
+    condition {
+      older_than = "2592000s"
+    }
+  }
+
   depends_on = [google_project_service.artifactregistry]
 }
 
@@ -32,12 +50,13 @@ resource "google_cloud_run_v2_service" "api" {
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
-    service_account = google_service_account.api_runtime.email
-    timeout         = "30s"
+    service_account                  = google_service_account.api_runtime.email
+    timeout                          = "30s"
+    max_instance_request_concurrency = 80
 
     scaling {
       min_instance_count = 0
-      max_instance_count = 4
+      max_instance_count = 2
     }
 
     volumes {
