@@ -14,5 +14,6 @@ class Application < Sequel::Model
     errors.add(:email, 'is not a valid email address') if !email.nil? && !email.empty? && !email.match?(/\A[^@\s]+@[^@\s]+\.[^@\s]+\z/)
     errors.add(:job_id, 'is required') if job_id.nil?
     errors.add(:job_id, 'does not exist') if !job_id.nil? && job.nil?
+    errors.add(:phone, 'is not a valid phone number') if !phone.nil? && !phone.empty? && !phone.match?(/\A\+?[\d\s\-\(\)\.]{7,20}\z/)
   end
 end
